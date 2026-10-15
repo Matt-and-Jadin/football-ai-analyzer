@@ -182,21 +182,23 @@ class PlayerDetector:
 
         return frame
 
-    def _draw_overlay(self, frame, text_info):
+    def _draw_overlay(self, frame, text_info, highlight=False):
         """
         Draw overlay text on the frame
 
         Args:
             frame: The image frame
             text_info: Dictionary with text to display
+            highlight: Whether to highlight the overlay (for formation changes)
 
         Returns:
             Frame with overlay text
         """
         # Background for text
         overlay = frame.copy()
-        cv2.rectangle(overlay, (10, 10), (400, 120), (0, 0, 0), -1)
-        cv2.addWeighted(overlay, 0.5, frame, 0.5, 0, frame)
+        bg_color = (255, 0, 0) if highlight else (0, 0, 0)  # Red if highlight, black otherwise
+        cv2.rectangle(overlay, (10, 10), (450, 130), bg_color, -1)
+        cv2.addWeighted(overlay, 0.6, frame, 0.4, 0, frame)
 
         # Draw text
         y_offset = 30
@@ -205,6 +207,39 @@ class PlayerDetector:
             cv2.putText(frame, text, (20, y_offset),
                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
             y_offset += 25
+
+        return frame
+
+    def _draw_field_zones(self, frame, width):
+        """
+        Draw field zone dividers (left, center, right thirds)
+
+        Args:
+            frame: The image frame
+            width: Width of the frame
+
+        Returns:
+            Frame with zone dividers
+        """
+        height = frame.shape[0]
+
+        # Draw vertical lines for field thirds
+        left_third = int(width * 0.33)
+        right_third = int(width * 0.67)
+
+        # Draw lines with transparency
+        overlay = frame.copy()
+        cv2.line(overlay, (left_third, 0), (left_third, height), (255, 255, 0), 2)
+        cv2.line(overlay, (right_third, 0), (right_third, height), (255, 255, 0), 2)
+        cv2.addWeighted(overlay, 0.3, frame, 0.7, 0, frame)
+
+        # Add labels
+        cv2.putText(frame, "LEFT", (left_third - 50, 30),
+                  cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0), 2)
+        cv2.putText(frame, "CENTER", (width // 2 - 40, 30),
+                  cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0), 2)
+        cv2.putText(frame, "RIGHT", (right_third + 20, 30),
+                  cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0), 2)
 
         return frame
 

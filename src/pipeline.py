@@ -107,6 +107,11 @@ def run_full_pipeline(video_path, config_path="config.yaml", create_annotated_vi
         create_annotated_video_output(frames, formations, detector, config)
         print("Annotated video saved to: data/processed/play1_annotated.mp4")
 
+    # Export to CSV
+    print("\nExporting formation data to CSV...")
+    export_to_csv(formations, "data/processed/formation_analysis.csv")
+    print("CSV saved to: data/processed/formation_analysis.csv")
+
     return formations
 
 
@@ -120,8 +125,14 @@ def create_annotated_video_output(frames, formations, detector, config):
     height, width = frames[0].shape[:2]
     out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
 
+    # Track formation changes
+    last_formation_type = None
+
     # Process each frame
     for frame_idx, (frame, formation) in enumerate(zip(frames, formations)):
+        # Draw field zones
+        frame = detector._draw_field_zones(frame, width)
+
         # Draw player boxes
         if frame_idx < len(formations):
             # Run detection on this frame
@@ -134,6 +145,11 @@ def create_annotated_video_output(frames, formations, detector, config):
             )
             frame = detector._draw_detections(frame, results[0])
 
+            # Check for formation change
+            formation_changed = (formation.formation_type != last_formation_type)
+            if formation_changed:
+                last_formation_type = formation.formation_type
+
             # Draw formation overlay
             overlay_text = {
                 'Formation': formation.formation_type.upper(),
@@ -141,11 +157,36 @@ def create_annotated_video_output(frames, formations, detector, config):
                 'Players': formation.total_players,
                 'Frame': frame_idx
             }
-            frame = detector._draw_overlay(frame, overlay_text)
+            frame = detector._draw_overlay(frame, overlay_text, highlight=formation_changed)
 
         out.write(frame)
 
     out.release()
+
+
+def export_to_csv(formations, output_path):
+    """Export formation data to CSV file"""
+    import csv
+
+    with open(output_path, 'w', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerow([
+            'Frame', 'Players', 'Left', 'Center', 'Right',
+            'Formation_Width', 'Formation_Type', 'Balance', 'Confidence'
+        ])
+
+        for formation in formations:
+            writer.writerow([
+                formation.frame_number,
+                formation.total_players,
+                formation.left_side_players,
+                formation.center_players,
+                formation.right_side_players,
+                f"{formation.formation_width:.2f}",
+                formation.formation_type,
+                formation.balance,
+                f"{formation.confidence:.2f}"
+            ])
 
 
 if __name__ == "__main__":
