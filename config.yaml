@@ -27,3 +27,9 @@ processing:
   skip_frames: 0  # Process every Nth frame (0 = process all frames)
   resize_width: 1280  # Resize video width for faster processing (0 = original)
   resize_height: 720  # Resize video height for faster processing (0 = original)
+
+# Formation analysis settings
+formation_analysis:
+  width_threshold: 0.5  # Formation width threshold (50% of field width)
+  min_players: 10  # Minimum players to consider formation valid
+  output_path: "data/processed/formation_analysis.json"  # Path to save analysis results
