@@ -25,6 +25,7 @@ data/processed/*
 # Model files (large binary files)
 models/*
 !models/.gitkeep
+*.pt  # YOLO model files (downloaded automatically)
 
 # IDE
 .vscode/

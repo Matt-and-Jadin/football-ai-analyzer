@@ -1,0 +1,24 @@
+# Core ML framework
+torch>=2.0.0
+torchvision>=0.15.0
+
+# Computer vision and object detection
+ultralytics>=8.0.0
+opencv-python>=4.8.0
+
+# Video processing
+opencv-contrib-python>=4.8.0
+
+# Configuration
+pyyaml>=6.0
+
+# Data handling
+numpy>=1.24.0
+pandas>=2.0.0
+
+# Jupyter for experimentation
+jupyter>=1.0.0
+ipykernel>=6.22.0
+
+# Utilities
+tqdm>=4.65.0

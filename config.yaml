@@ -1,0 +1,29 @@
+# Football AI Analyzer Configuration
+
+# Model settings
+model:
+  name: "yolov8s.pt"  # Small model - better accuracy, still fast
+  confidence_threshold: 0.25  # Lowered to catch pre-snap players
+  iou_threshold: 0.45  # IoU threshold for NMS
+  device: "cuda"  # Use GPU if available, set to "cpu" if needed
+
+# Detection settings
+detection:
+  target_classes: ["person"]  # Detect people (players)
+  draw_boxes: true  # Draw bounding boxes on output
+  draw_labels: true  # Draw class labels on output
+  box_color: [0, 255, 0]  # Green boxes (BGR format)
+  box_thickness: 2
+
+# Video settings
+video:
+  input_path: "data/raw/play1.mp4"  # Path to input video
+  output_path: "data/processed/play1_detected.mp4"  # Path to output video
+  fps: 30  # Output FPS
+  fourcc: "mp4v"  # Video codec
+
+# Processing settings
+processing:
+  skip_frames: 0  # Process every Nth frame (0 = process all frames)
+  resize_width: 1280  # Resize video width for faster processing (0 = original)
+  resize_height: 720  # Resize video height for faster processing (0 = original)
