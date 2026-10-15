@@ -5,7 +5,7 @@ model:
   name: "yolov8s.pt"  # Small model - better accuracy, still fast
   confidence_threshold: 0.25  # Lowered to catch pre-snap players
   iou_threshold: 0.45  # IoU threshold for NMS
-  device: "cuda"  # Use GPU if available, set to "cpu" if needed
+  device: "cuda"  # Use GPU (RTX 4070), set to "cpu" if needed
 
 # Detection settings
 detection:

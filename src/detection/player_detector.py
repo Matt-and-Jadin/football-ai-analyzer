@@ -42,6 +42,10 @@ class PlayerDetector:
         if device == "cuda" and not torch.cuda.is_available():
             print("CUDA not available, falling back to CPU")
             device = "cpu"
+        else:
+            print(f"Using device: {device}")
+            if device == "cuda":
+                print(f"GPU: {torch.cuda.get_device_name(0)}")
         return device
 
     def detect_players(self, video_path, output_path=None):
