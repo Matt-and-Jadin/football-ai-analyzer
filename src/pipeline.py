@@ -9,18 +9,20 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import cv2
 import yaml
+import numpy as np
 from tqdm import tqdm
 from src.detection.player_detector import PlayerDetector
 from src.analysis.formation_analyzer import FormationAnalyzer
 
 
-def run_full_pipeline(video_path, config_path="config.yaml"):
+def run_full_pipeline(video_path, config_path="config.yaml", create_annotated_video=True):
     """
     Run the full analysis pipeline: detection + formation analysis
 
     Args:
         video_path: Path to the video file
         config_path: Path to the configuration YAML file
+        create_annotated_video: Whether to create a video with formation overlays
     """
     # Load config
     with open(config_path, 'r') as f:
@@ -40,12 +42,14 @@ def run_full_pipeline(video_path, config_path="config.yaml"):
         raise ValueError(f"Could not open video file: {video_path}")
 
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 
-    print(f"Processing video: {width}x{int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))}, {total_frames} frames")
+    print(f"Processing video: {width}x{height}, {total_frames} frames")
 
-    # Collect detection results
+    # Collect detection results and frames
     detection_results = []
+    frames = []
     frame_count = 0
 
     with tqdm(total=total_frames, desc="Running detection") as pbar:
@@ -70,6 +74,7 @@ def run_full_pipeline(video_path, config_path="config.yaml"):
                 boxes.append([x1, y1, x2, y2])
 
             detection_results.append(boxes)
+            frames.append(frame)
             frame_count += 1
             pbar.update(1)
 
@@ -96,7 +101,51 @@ def run_full_pipeline(video_path, config_path="config.yaml"):
     print(f"Average formation width: {summary['avg_formation_width']:.1f} pixels")
     print("="*50)
 
+    # Create annotated video if requested
+    if create_annotated_video:
+        print("\nCreating annotated video with formation overlays...")
+        create_annotated_video_output(frames, formations, detector, config)
+        print("Annotated video saved to: data/processed/play1_annotated.mp4")
+
     return formations
+
+
+def create_annotated_video_output(frames, formations, detector, config):
+    """Create a video with formation information overlaid"""
+    # Setup video writer
+    output_path = "data/processed/play1_annotated.mp4"
+    fourcc = cv2.VideoWriter_fourcc(*config['video']['fourcc'])
+    fps = config['video']['fps']
+
+    height, width = frames[0].shape[:2]
+    out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+
+    # Process each frame
+    for frame_idx, (frame, formation) in enumerate(zip(frames, formations)):
+        # Draw player boxes
+        if frame_idx < len(formations):
+            # Run detection on this frame
+            results = detector.model(
+                frame,
+                conf=detector.config['model']['confidence_threshold'],
+                iou=detector.config['model']['iou_threshold'],
+                device=detector.device,
+                verbose=False
+            )
+            frame = detector._draw_detections(frame, results[0])
+
+            # Draw formation overlay
+            overlay_text = {
+                'Formation': formation.formation_type.upper(),
+                'Balance': formation.balance.upper(),
+                'Players': formation.total_players,
+                'Frame': frame_idx
+            }
+            frame = detector._draw_overlay(frame, overlay_text)
+
+        out.write(frame)
+
+    out.release()
 
 
 if __name__ == "__main__":

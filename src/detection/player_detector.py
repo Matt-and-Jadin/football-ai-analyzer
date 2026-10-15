@@ -48,13 +48,14 @@ class PlayerDetector:
                 print(f"GPU: {torch.cuda.get_device_name(0)}")
         return device
 
-    def detect_players(self, video_path, output_path=None):
+    def detect_players(self, video_path, output_path=None, overlay_text=None):
         """
         Detect players in a video file
 
         Args:
             video_path: Path to input video file
             output_path: Path to save output video (optional, uses config if not provided)
+            overlay_text: Optional text to overlay on each frame (e.g., formation info)
 
         Returns:
             Path to the output video file
@@ -118,6 +119,10 @@ class PlayerDetector:
                 # Draw detections
                 frame = self._draw_detections(frame, results[0])
 
+                # Draw overlay text if provided
+                if overlay_text and frame_count < len(overlay_text):
+                    frame = self._draw_overlay(frame, overlay_text[frame_count])
+
                 # Write frame
                 out.write(frame)
 
@@ -174,6 +179,32 @@ class PlayerDetector:
                                  (x1 + label_size[0], y1), box_color, -1)
                     cv2.putText(frame, label, (x1, y1 - 5),
                               cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 2)
+
+        return frame
+
+    def _draw_overlay(self, frame, text_info):
+        """
+        Draw overlay text on the frame
+
+        Args:
+            frame: The image frame
+            text_info: Dictionary with text to display
+
+        Returns:
+            Frame with overlay text
+        """
+        # Background for text
+        overlay = frame.copy()
+        cv2.rectangle(overlay, (10, 10), (400, 120), (0, 0, 0), -1)
+        cv2.addWeighted(overlay, 0.5, frame, 0.5, 0, frame)
+
+        # Draw text
+        y_offset = 30
+        for key, value in text_info.items():
+            text = f"{key}: {value}"
+            cv2.putText(frame, text, (20, y_offset),
+                      cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+            y_offset += 25
 
         return frame
 
