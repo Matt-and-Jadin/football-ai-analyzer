@@ -1,6 +1,6 @@
 # Core ML framework: PyTorch powers YOLO under the hood.
-# NOTE: the default torch build uses the CPU only — you need a CUDA build
-# of torch to actually use an NVIDIA GPU.
+# NOTE: on Windows, a plain `pip install torch` gets a CPU-only build; to
+# use an NVIDIA GPU, install the CUDA build using the command from pytorch.org.
 torch>=2.0.0
 torchvision>=0.15.0
 
