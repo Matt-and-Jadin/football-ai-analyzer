@@ -1,34 +1,50 @@
 # Football AI Analyzer Configuration
+# Every setting the pipeline uses lives here. Edit values, not code.
 
-# Model settings
+# Model settings: which YOLOv8 model to load and how picky it should be.
+# Model sizes run yolov8n/s/m/l/x (nano -> extra-large); bigger is more
+# accurate but slower. The weights file downloads automatically on first run.
 model:
   name: "yolov8s.pt"  # Small model - better accuracy, still fast
   confidence_threshold: 0.25  # Lowered to catch pre-snap players
+  # Detections scoring below confidence_threshold are discarded.
   iou_threshold: 0.45  # IoU threshold for NMS
+  # NMS (non-maximum suppression): when two predicted boxes overlap more
+  # than this IoU (Intersection-over-Union) value, only the higher-scoring
+  # box is kept, so one player doesn't get boxed twice.
   device: "cuda"  # Use GPU (RTX 4070), set to "cpu" if needed
+  # "cuda" = NVIDIA GPU. If no CUDA GPU is available, the code falls back
+  # to "cpu" automatically at runtime.
 
-# Detection settings
+# Detection settings: what to look for and how to draw it on the video.
 detection:
   target_classes: ["person"]  # Detect people (players)
   draw_boxes: true  # Draw bounding boxes on output
   draw_labels: true  # Draw class labels on output
   box_color: [0, 255, 0]  # Green boxes (BGR format)
+  # OpenCV uses BGR order, not RGB: the numbers are (blue, green, red).
   box_thickness: 2
 
-# Video settings
+# Video settings: where files live and how the output video is encoded.
 video:
   input_path: "data/raw/play1.mp4"  # Path to input video
   output_path: "data/processed/play1_detected.mp4"  # Path to output video
   fps: 30  # Output FPS
   fourcc: "mp4v"  # Video codec
+  # fourcc is a 4-character code naming the video codec; "mp4v" writes .mp4.
 
-# Processing settings
+# Processing settings: speed/accuracy trade-offs.
+# skip_frames skips that many frames between each processed one
+# (0 = process all frames, 1 = every other frame, ...). Skipped frames are
+# dropped, so with skip_frames > 0 the output video plays shorter/faster
+# at the same fps.
 processing:
   skip_frames: 0  # Process every Nth frame (0 = process all frames)
   resize_width: 1280  # Resize video width for faster processing (0 = original)
   resize_height: 720  # Resize video height for faster processing (0 = original)
 
-# Formation analysis settings
+# Formation analysis settings: how the analyzer judges the group of
+# detected people (left/center/right thirds of the SCREEN, not field lines).
 formation_analysis:
   width_threshold: 0.5  # Formation width threshold (50% of field width)
   min_players: 10  # Minimum players to consider formation valid

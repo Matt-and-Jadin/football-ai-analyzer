@@ -1,6 +1,22 @@
 """
 Formation Analysis Module
-Analyzes player positions to identify football formations
+
+Where this fits in the overall flow:
+    video file -> OpenCV reads frames -> YOLOv8 finds people (bounding boxes)
+    -> FormationAnalyzer turns boxes into per-frame stats
+    -> outputs JSON / CSV / annotated MP4
+
+This file is the "turns boxes into stats" step. For each frame it takes
+the list of bounding boxes YOLO found, works out where each person's
+center is, and produces simple stats: how many people are on the
+left/center/right of the screen, how wide the group spreads, and whether
+the formation looks "tight" or "spread".
+
+Important context: the "zones" are thirds of the SCREEN divided by
+pixel x-position (33% / 67% of the frame width), not actual field
+markings — the result depends on the camera angle and zoom. Also, every
+detected person is counted: both teams, referees, and anyone on the
+sidelines. There is no team separation yet.
 """
 
 import numpy as np
@@ -11,7 +27,12 @@ import json
 
 @dataclass
 class FormationData:
-    """Data structure for formation analysis results"""
+    """Data structure for formation analysis results
+
+    @dataclass makes Python auto-generate __init__ (and a few other
+    methods) so this class works as a simple data-holder: one
+    FormationData object = one row of results for one frame.
+    """
     frame_number: int
     total_players: int
     left_side_players: int
@@ -50,6 +71,7 @@ class FormationAnalyzer:
         Returns:
             FormationData object with analysis results
         """
+        # No detections in this frame: return an "empty" result row.
         if len(boxes) == 0:
             return FormationData(
                 frame_number=frame_number,
@@ -63,7 +85,9 @@ class FormationAnalyzer:
                 confidence=0.0
             )
 
-        # Calculate player centers
+        # Calculate player centers: the midpoint of each bounding box.
+        # We only use the x-position below, so "where on screen" means
+        # horizontal position.
         player_centers = []
         for box in boxes:
             x1, y1, x2, y2 = box
@@ -73,28 +97,34 @@ class FormationAnalyzer:
 
         player_centers = np.array(player_centers)
 
-        # Divide field into thirds
+        # Divide field into thirds of the screen width (pixels, not
+        # real field markings)
         left_threshold = video_width * 0.33
         right_threshold = video_width * 0.67
 
-        # Count players in each zone
+        # Count players in each zone. np.sum on a boolean array counts
+        # how many entries are True, i.e. how many centers fall in the zone.
         left_side = np.sum(player_centers[:, 0] < left_threshold)
         right_side = np.sum(player_centers[:, 0] > right_threshold)
         center = len(player_centers) - left_side - right_side
 
-        # Calculate formation width
+        # Calculate formation width: horizontal distance between the
+        # leftmost and rightmost person centers, in pixels.
         min_x = np.min(player_centers[:, 0])
         max_x = np.max(player_centers[:, 0])
         formation_width = max_x - min_x
 
-        # Determine formation type based on width
+        # Determine formation type based on width: if the group spans less
+        # than width_threshold (50%) of the frame width it's "tight",
+        # otherwise "spread".
         width_threshold = video_width * self.analysis_config.get('width_threshold', 0.5)
         if formation_width < width_threshold:
             formation_type = "tight"
         else:
             formation_type = "spread"
 
-        # Determine balance
+        # Determine balance: "balanced" when left and right counts are
+        # within 2 of each other, otherwise which side has more.
         if abs(left_side - right_side) <= 2:
             balance = "balanced"
         elif left_side > right_side:
@@ -102,7 +132,12 @@ class FormationAnalyzer:
         else:
             balance = "right_heavy"
 
-        # Calculate confidence based on player count
+        # Calculate confidence based on player count. This is NOT the
+        # model's detection confidence — it's just total_players /
+        # min_players capped at 1.0, so it only says "did we see at least
+        # min_players people". min_players is used only here: the config
+        # comment says "minimum players to consider formation valid", but
+        # no formation is ever rejected for falling below it.
         total_players = len(player_centers)
         min_players = self.analysis_config.get('min_players', 10)
         confidence = min(1.0, total_players / min_players)
@@ -147,6 +182,9 @@ class FormationAnalyzer:
 
     def _save_formations(self, formations, output_path):
         """Save formation analysis to JSON file"""
+        # The zone counts/widths above are NumPy integers/floats, and
+        # json can't serialize NumPy types — hence the int()/float()
+        # wrappers converting everything to plain Python numbers.
         data = [
             {
                 'frame_number': int(f.frame_number),
@@ -199,6 +237,10 @@ class FormationAnalyzer:
 
 def main():
     """Main function to run formation analysis"""
+    # NOTE: this main() is broken — analyze_video() expects a list of
+    # per-frame boxes plus video_width, but here it's called with a path
+    # string (and no width), which raises TypeError. Use src/pipeline.py
+    # to run the analysis instead.
     analyzer = FormationAnalyzer()
 
     # Analyze the video

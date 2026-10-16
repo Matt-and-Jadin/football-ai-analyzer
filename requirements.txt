@@ -1,24 +1,32 @@
-# Core ML framework
+# Core ML framework: PyTorch powers YOLO under the hood.
+# NOTE: the default torch build uses the CPU only — you need a CUDA build
+# of torch to actually use an NVIDIA GPU.
 torch>=2.0.0
 torchvision>=0.15.0
 
-# Computer vision and object detection
+# Computer vision and object detection:
+# ultralytics provides the YOLO model, opencv-python provides cv2
+# (reading/writing video, drawing boxes and text).
 ultralytics>=8.0.0
 opencv-python>=4.8.0
 
 # Video processing
+# NOTE: opencv-contrib-python installs the same `cv2` module as
+# opencv-python (contrib is a superset with extra features) — installing
+# both can conflict; normally you pick just one.
 opencv-contrib-python>=4.8.0
 
-# Configuration
+# Configuration: parses config.yaml
 pyyaml>=6.0
 
-# Data handling
+# Data handling: numpy for array math on box coordinates.
+# NOTE: pandas is listed but isn't imported anywhere in the code yet.
 numpy>=1.24.0
 pandas>=2.0.0
 
-# Jupyter for experimentation
+# Jupyter for experimentation (notebooks)
 jupyter>=1.0.0
 ipykernel>=6.22.0
 
-# Utilities
+# Utilities: tqdm draws the progress bar while processing frames
 tqdm>=4.65.0
