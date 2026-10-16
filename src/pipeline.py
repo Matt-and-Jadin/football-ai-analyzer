@@ -1,10 +1,22 @@
 """
 Main pipeline for football film analysis
-Combines player detection and formation analysis
+
+Where this fits in the overall flow:
+    video file -> OpenCV reads frames -> YOLOv8 finds people (bounding boxes)
+    -> FormationAnalyzer turns boxes into per-frame stats
+    -> outputs JSON / CSV / annotated MP4
+
+This file wires the whole thing together. Run it from the repo root:
+    python src/pipeline.py
+It reads the video, collects YOLO boxes per frame, runs formation
+analysis, prints a summary, and writes the annotated MP4 + CSV.
 """
 
 import sys
 import os
+# Add the repo root to Python's import search path so that
+# `from src.detection...` works when running `python src/pipeline.py`
+# directly (without this, Python wouldn't find the `src` package).
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import cv2
@@ -18,6 +30,9 @@ from src.analysis.formation_analyzer import FormationAnalyzer
 def run_full_pipeline(video_path, config_path="config.yaml", create_annotated_video=True):
     """
     Run the full analysis pipeline: detection + formation analysis
+
+    All file paths (config.yaml, data/...) are relative, so run this from
+    the repo root directory.
 
     Args:
         video_path: Path to the video file
@@ -48,10 +63,15 @@ def run_full_pipeline(video_path, config_path="config.yaml", create_annotated_vi
     print(f"Processing video: {width}x{height}, {total_frames} frames")
 
     # Collect detection results and frames
+    # NOTE: every frame is kept in memory in `frames`, so long videos can
+    # run out of RAM.
     detection_results = []
     frames = []
     frame_count = 0
 
+    # NOTE: this loop ignores the processing.resize_* and skip_frames
+    # settings from config.yaml — unlike player_detector.detect_players,
+    # it processes every frame at full size.
     with tqdm(total=total_frames, desc="Running detection") as pbar:
         while cap.isOpened():
             ret, frame = cap.read()
@@ -67,7 +87,10 @@ def run_full_pipeline(video_path, config_path="config.yaml", create_annotated_vi
                 verbose=False
             )
 
-            # Get boxes
+            # Get boxes: xyxy pixel coordinates for every detection.
+            # NOTE: these boxes are NOT filtered to the "person" class —
+            # any COCO class YOLO detects (e.g. a sports ball) is passed to
+            # the analyzer and counted as a player.
             boxes = []
             for box in results[0].boxes:
                 x1, y1, x2, y2 = box.xyxy[0].cpu().numpy()
@@ -80,7 +103,8 @@ def run_full_pipeline(video_path, config_path="config.yaml", create_annotated_vi
 
     cap.release()
 
-    # Run formation analysis
+    # Run formation analysis: turns the per-frame box lists into
+    # per-frame FormationData rows (and saves them to JSON).
     print("\nRunning formation analysis...")
     formations = analyzer.analyze_video(detection_results, width)
 
@@ -102,6 +126,8 @@ def run_full_pipeline(video_path, config_path="config.yaml", create_annotated_vi
     print("="*50)
 
     # Create annotated video if requested
+    # NOTE: output paths are hardcoded to data/processed/play1_annotated.mp4
+    # and formation_analysis.csv regardless of which input video you use.
     if create_annotated_video:
         print("\nCreating annotated video with formation overlays...")
         create_annotated_video_output(frames, formations, detector, config)
@@ -117,7 +143,7 @@ def run_full_pipeline(video_path, config_path="config.yaml", create_annotated_vi
 
 def create_annotated_video_output(frames, formations, detector, config):
     """Create a video with formation information overlaid"""
-    # Setup video writer
+    # Setup video writer. fourcc is a 4-character codec code ("mp4v" for .mp4).
     output_path = "data/processed/play1_annotated.mp4"
     fourcc = cv2.VideoWriter_fourcc(*config['video']['fourcc'])
     fps = config['video']['fps']
@@ -125,15 +151,21 @@ def create_annotated_video_output(frames, formations, detector, config):
     height, width = frames[0].shape[:2]
     out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
 
-    # Track formation changes
+    # Track formation changes: when the formation type flips between
+    # frames, the overlay gets highlighted so the change stands out.
     last_formation_type = None
 
     # Process each frame
+    # NOTE: detection runs a SECOND time here (per frame) just to draw the
+    # boxes — the first pass above already found them. That makes the
+    # pipeline roughly 2x slower than it needs to be.
     for frame_idx, (frame, formation) in enumerate(zip(frames, formations)):
         # Draw field zones
         frame = detector._draw_field_zones(frame, width)
 
         # Draw player boxes
+        # NOTE: this check is always true here — frames and formations
+        # have equal length by construction.
         if frame_idx < len(formations):
             # Run detection on this frame
             results = detector.model(
@@ -165,7 +197,7 @@ def create_annotated_video_output(frames, formations, detector, config):
 
 
 def export_to_csv(formations, output_path):
-    """Export formation data to CSV file"""
+    """Export formation data to CSV file: one row per frame."""
     import csv
 
     with open(output_path, 'w', newline='') as f:
@@ -190,6 +222,8 @@ def export_to_csv(formations, output_path):
 
 
 if __name__ == "__main__":
+    # `if __name__ == "__main__":` means this block only runs when the file
+    # is executed directly (python src/pipeline.py), not when it's imported.
     # Load config to get video path
     with open("config.yaml", 'r') as f:
         config = yaml.safe_load(f)
